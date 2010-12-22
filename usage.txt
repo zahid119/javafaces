@@ -1,0 +1,5 @@
+ant run 
+
+
+-----------------------------------------
+The code uses jai-imageio for image handling,and colt package for matrix calculations.These jar files are in the lib directory.Tiff format is supported since jai-imageio is used.
