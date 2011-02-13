@@ -3,12 +3,36 @@ package facerecognition.javafaces;
 import java.awt.image.*;
 import java.io.*;
 import java.util.*;
+import java.util.logging.FileHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+
 import javax.imageio.ImageIO;
+
+import facerecognition.utils.ValueIndexPairComparator;
+
+import facerecognition.utils.ValueIndexPair;
 
 
 public class FaceRec{
 	private FaceBundle bundle;
-	private double[][] weights;	
+	private double[][] weights;
+	Handler fh;
+	Logger logger = Logger.getLogger("facerecognition.javafaces.FaceRec");
+	public FaceRec(){
+		try {
+			fh = new FileHandler("facerec.log");
+			fh.setFormatter(new SimpleFormatter());
+			logger.addHandler(fh);
+		} catch (SecurityException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+	}
 	public MatchResult findMatchResult(String imageFileName,int selectedeigenfaces,double thresholdVal){
 		boolean match = false;
 		String message = null;
@@ -16,7 +40,8 @@ public class FaceRec{
 		double minimumDistance = 0.0;
 		try{
 			checkImageSizeCompatibility(imageFileName);
-			Matrix2D inputFace = getNormalisedInputFace(imageFileName);				
+			Matrix2D inputFace = getNormalisedInputFace(imageFileName);
+			
 			inputFace.subtract(new Matrix2D(bundle.getAvgFace(),1));
 			Matrix2D inputWts = getInputWeights(selectedeigenfaces, inputFace);				
 			double[] distances = getDistances(inputWts);		
@@ -57,38 +82,42 @@ public class FaceRec{
 	
 	private Matrix2D getInputWeights(int selectedeigenfaces, Matrix2D inputFace) {
 		double[][] eigenFacesArray = this.bundle.getEigenFaces();
-		Matrix2D eigenFacesMatrix=new Matrix2D(eigenFacesArray);
-		Matrix2D eigenFacesMatrixPart=eigenFacesMatrix.getSubMatrix(selectedeigenfaces);
-		Matrix2D eigenFacesMatrixPartTranspose=eigenFacesMatrixPart.transpose();
-		Matrix2D inputWts=inputFace.multiply(eigenFacesMatrixPartTranspose);
+		Matrix2D eigenFacesMatrix = new Matrix2D(eigenFacesArray);
+		Matrix2D eigenFacesMatrixPart = eigenFacesMatrix.getSubMatrix(selectedeigenfaces);
+		Matrix2D eigenFacesMatrixPartTranspose = eigenFacesMatrixPart.transpose();
+		Matrix2D inputWts = inputFace.multiply(eigenFacesMatrixPartTranspose);
 		return inputWts;
 	}
 	
 	private Matrix2D getNormalisedInputFace(String imageFileName) throws FaceRecError {
 		double[] inputFaceData = getImageData(imageFileName);
-		Matrix2D inputFace=new Matrix2D(inputFaceData,1);		
+		Matrix2D inputFace = new Matrix2D(inputFaceData,1);
+		//logger.info("inputface");
+		//logger.info(inputFace.toString());
 		inputFace.normalise();
+		//logger.info("normalised inputface");
+		//logger.info(inputFace.toString());
 		return inputFace;
 	}
 
 	private ImageDistanceInfo getMinimumDistanceInfo(double[] distances) {
 		double minimumDistance = Double.MAX_VALUE;
-		int index=0;
+		int index = 0;
 		for (int i = 0; i < distances.length; i++) {
 			if (distances[i] < minimumDistance) { 
-				minimumDistance=distances[i];
-				index=i;				
+				minimumDistance = distances[i];
+				index = i;				
 			}
 		}
 		return new ImageDistanceInfo(distances[index], index);		
 	}
 	
 	private double[] getDistances(Matrix2D inputWt) {			
-		Matrix2D tempWt=new Matrix2D(this.weights);	
-		double[] inputWtData=inputWt.flatten();		
+		Matrix2D tempWt = new Matrix2D(this.weights);	
+		double[] inputWtData = inputWt.flatten();		
 		tempWt.subtractFromEachRow(inputWtData);
 		tempWt.multiplyElementWise(tempWt);
-		double[][] temp=tempWt.toArray();
+		double[][] temp = tempWt.toArray();
 		double[] distances = new double[temp.length];
 		for (int i = 0; i < temp.length; i++) {
 			double sum = 0.0;
@@ -101,14 +130,14 @@ public class FaceRec{
 	}
 	
 	private double[] getImageData(String imageFileName) throws FaceRecError {
-		BufferedImage bi =null;
-		double[] inputFace =null;
+		BufferedImage bi = null;
+		double[] inputFace = null;
 		try{
 			bi = ImageIO.read(new File(imageFileName));
 		}catch(IOException ioe){
 			throw new FaceRecError(ioe.getMessage());
 		}
-		if (bi!=null){
+		if (bi != null){
 		int imageWidth = bi.getWidth();
 		int imageHeight = bi.getHeight();
 		inputFace = new double[imageWidth * imageHeight];
@@ -118,168 +147,169 @@ public class FaceRec{
 	}	
 	
 	private void doCalculations(String dir,List<String> imglist,int selectedNumOfEigenFaces) throws FaceRecError, IOException{
-		FaceBundle b=createFaceBundle(imglist);		
-		double[][] wts=calculateWeights(b,selectedNumOfEigenFaces);		
-		this.bundle=b;
-		this.weights=wts;
+		FaceBundle b = createFaceBundle(imglist);		
+		double[][] wts = calculateWeights(b,selectedNumOfEigenFaces);		
+		this.bundle = b;
+		this.weights = wts;
 		writeCache(dir,b);
 	}
 	
 	private double[][] calculateWeights(FaceBundle b,int selectedNumOfEigenFaces){
-		Matrix2D eigenFaces=new Matrix2D(b.getEigenFaces());
-		Matrix2D eigenFacesPart=eigenFaces.getSubMatrix(selectedNumOfEigenFaces);
-		Matrix2D adjustedFaces=new Matrix2D(b.getAdjustedFaces());
-		Matrix2D eigenFacesPartTr=eigenFacesPart.transpose();
-		Matrix2D wts=adjustedFaces.multiply(eigenFacesPartTr);
+		Matrix2D eigenFaces = new Matrix2D(b.getEigenFaces());
+		Matrix2D eigenFacesPart = eigenFaces.getSubMatrix(selectedNumOfEigenFaces);
+		Matrix2D adjustedFaces = new Matrix2D(b.getAdjustedFaces());
+		Matrix2D eigenFacesPartTr = eigenFacesPart.transpose();
+		Matrix2D wts = adjustedFaces.multiply(eigenFacesPartTr);
 		return wts.toArray();
 	}
 	
 	public FaceBundle createFaceBundle(List<String> filenames) throws FaceRecError, IOException{
-		BufferedImage[] bufimgs=getGrayScaleImages(filenames);
+		BufferedImage[] bufimgs = getGrayScaleImages(filenames);
 		checkImageDimensions(filenames, bufimgs);
-		Matrix2D imagesData=getNormalisedImagesData(bufimgs);
-		double[] averageFace=imagesData.getAverageOfEachColumn();
+		Matrix2D imagesData = getNormalisedImagesData(bufimgs);
+		double[] averageFace = imagesData.getAverageOfEachColumn();
 		imagesData.adjustToZeroMean();
+		//logger.info("imagesData adjusted ToZeroMean");
+		//logger.info(imagesData.toString());
 		EigenvalueDecomposition egdecomp = getEigenvalueDecomposition(imagesData);
-		double[] eigenvalues=egdecomp.getEigenValues();
-		double[][]eigvectors=egdecomp.getEigenVectors();
-		sortEigenVectors(eigenvalues,eigvectors);
-		Matrix2D eigenFaces=getNormalisedEigenFaces(imagesData,new Matrix2D(eigvectors));
-		int imageWidth=bufimgs[0].getWidth();
+		double[] eigenvalues = egdecomp.getEigenValues();
+		double[][]eigvectors = egdecomp.getEigenVectors();
+		
+		logger.info("eigenvalues");
+		logger.info(new Matrix2D(eigenvalues,1).toString());
+		
+		logger.info("eigvectors");
+		logger.info(new Matrix2D(eigvectors).toString());
+		
+		//sortEigenVectors(eigenvalues,eigvectors);
+		ArrayList<ValueIndexPair> pairList = getSortedPairs(eigenvalues, eigvectors);
+		eigenvalues = getSortedVector(pairList);
+		eigvectors = getSortedMatrix(eigvectors,pairList);
+		
+		
+		
+		//logger.info("AFTER SORTING");
+		//logger.info("eigenvalues");
+		//logger.info(new Matrix2D(eigenvalues,1).toString());
+		
+		//logger.info("eigvectors");
+		//logger.info(new Matrix2D(eigvectors).toString());
+		
+		Matrix2D eigenFaces = getNormalisedEigenFaces(imagesData,new Matrix2D(eigvectors));
+		int imageWidth = bufimgs[0].getWidth();
 		createEigenFaceImages(eigenFaces,imageWidth);
-		int imageHeight=bufimgs[0].getHeight();
+		int imageHeight = bufimgs[0].getHeight();
 		FaceBundle b = new FaceBundle(filenames,imagesData.toArray(),averageFace,eigenFaces.toArray(),eigenvalues,imageWidth,imageHeight);
 		return b;	
+	}
+	public double[] getSortedVector(ArrayList<ValueIndexPair> pairList) {
+		double[] sortedVector = new double[pairList.size()];
+		for(int i = 0; i < pairList.size(); i++){
+			sortedVector[i] = pairList.get(i).getVectorElement();
+		}
+		return sortedVector;
+	}
+	
+	public  double[][] getSortedMatrix(double[][] origmatrix,ArrayList<ValueIndexPair> pairList){
+		int rows = pairList.size();
+		int cols = origmatrix[0].length; 
+		double[][] sortedMatrix  = new double[rows][cols];
+		//fill a 2D array using data from rows of original matrix
+		for(int i = 0; i < pairList.size(); i++){
+			sortedMatrix[i] = origmatrix[ pairList.get(i).getMatrixRowIndex()];
+		}
+		return sortedMatrix;
+	}
+	
+	public  ArrayList<ValueIndexPair> getSortedPairs(double[] aVector,
+			double[][] aMatrix) {
+		ArrayList<ValueIndexPair> pairList = createPairs(aVector, aMatrix);
+		ValueIndexPairComparator dpc = new ValueIndexPairComparator();
+		Collections.sort(pairList, dpc);
+		return pairList;
+	}
+	
+	public  ArrayList<ValueIndexPair> createPairs(double[] aVector, double[][] aMatrix) {
+		ArrayList<ValueIndexPair> pList = null;
+		if (aVector.length != aMatrix.length){
+			printError("matrix rows don't match items in vector ");
+		}else{
+			pList = new ArrayList<ValueIndexPair>(aVector.length);
+			for(int i = 0; i < aVector.length; i++){
+				ValueIndexPair dp = new ValueIndexPair(aVector[i],i);
+				pList.add(dp);
+			}
+		}
+		return pList;
+		
 	}
 	
 	private EigenvalueDecomposition getEigenvalueDecomposition(
 			Matrix2D imagesData) {
-		Matrix2D imagesDataTr=imagesData.transpose();
-		Matrix2D covarianceMatrix=imagesData.multiply(imagesDataTr);
-		EigenvalueDecomposition egdecomp =covarianceMatrix.getEigenvalueDecomposition();
+		Matrix2D imagesDataTr = imagesData.transpose();
+		Matrix2D covarianceMatrix = imagesData.multiply(imagesDataTr);
+		EigenvalueDecomposition egdecomp = covarianceMatrix.getEigenvalueDecomposition();
 		return egdecomp;
 	}
 	
-	public void createEigenFaceImages(Matrix2D egfaces,int imgwidth) throws IOException{
-		double[][] eigenfacesArray=egfaces.toArray();						
-		String fldrname=".."+File.separator+"eigenfaces";
+	public void createEigenFaceImages(Matrix2D eigenfaces,int imgwidth) throws IOException{
+        logger.info("creating eigenfaces");
+		double[][] eigenfacesArray = eigenfaces.toArray();						
+		String fldrname = ".." + File.separator + "eigenfaces";
 		makeNewFolder(fldrname);
-		String prefix="eigen";
-		String ext=".png";		
-		for(int i=0;i<eigenfacesArray.length;i++){
-			double[] egface=eigenfacesArray[i];
-			String filename=fldrname+File.separator+prefix+i+ext;			
+		String prefix = "eigen";
+		String ext = ".png";		
+		for(int i = 0; i < eigenfacesArray.length; i++){
+			double[] egface = eigenfacesArray[i];
+			String filename = fldrname + File.separator + prefix + i + ext;			
 			createImageFromArray(filename,egface,imgwidth);
 		}
+        logger.info("created eigenfaces.");
 	}
 	
 	private Matrix2D getNormalisedEigenFaces(Matrix2D imagesData,Matrix2D eigenVectors) {
-		Matrix2D eigenVectorsTr=eigenVectors.transpose();
-		Matrix2D eigenFaces=eigenVectorsTr.multiply(imagesData);
+		Matrix2D eigenFaces = eigenVectors.multiply(imagesData);
 		double[][] eigenFacesData=eigenFaces.toArray();
-		for(int i=0;i<eigenFacesData.length;i++){
-			double norm=Matrix2D.norm(eigenFacesData[i]);
-			for(int j=0;j<eigenFacesData[i].length;j++){
-				double v=eigenFacesData[i][j];
-				eigenFacesData[i][j]=v/norm;
+		for(int i = 0; i < eigenFacesData.length; i++){
+			double norm = Matrix2D.norm(eigenFacesData[i]);
+			for(int j = 0; j < eigenFacesData[i].length; j++){
+				double v = eigenFacesData[i][j];
+				eigenFacesData[i][j] = v/norm;
 			}
 		}
 		return new Matrix2D(eigenFacesData);
 	}
 	
-	public void sortEigenVectors(double[] eigenValues,double[][]eigenVectors){
-		Hashtable<Double,double[]> table =  new Hashtable<Double,double[]> ();	
-		Double[] evals=new Double[eigenValues.length];
-		getEigenValuesAsDouble(eigenValues, evals);		
-		fillHashtable(eigenValues, eigenVectors, table, evals);
-		ArrayList<Double> keylist = sortKeysInReverse(table);				
-		updateEigenVectors(eigenVectors, table, evals, keylist);		
-		Double[] sortedkeys=new Double[keylist.size()];
-		keylist.toArray(sortedkeys);//store the sorted list elements in an array
-		//use the array to update the original double[]eigValues
-		updateEigenValues(eigenValues, sortedkeys);		
-	}
-	
-	private void getEigenValuesAsDouble(double[] eigenValue, Double[] evals) {
-		for(int i=0;i<eigenValue.length;i++){
-			evals[i]=new Double(eigenValue[i]);
-		}
-	}
-	
-	private ArrayList<Double> sortKeysInReverse(Hashtable<Double, double[]> table) {
-		Enumeration<Double> keys=table.keys();
-		ArrayList<Double> keylist=Collections.list(keys);		
-		Collections.sort(keylist,Collections.reverseOrder());//largest first
-		return keylist;
-	}
-	
-	private void updateEigenValues(double[] eigenValue, Double[] sortedkeys) {
-		for(int i=0;i<sortedkeys.length;i++){
-			Double dbl=sortedkeys[i];
-			double dblval=dbl.doubleValue();
-			eigenValue[i]=dblval;
-		}
-	}
-	
-	private void updateEigenVectors(double[][] eigenVector,
-			Hashtable<Double, double[]> table, Double[] evals,
-			ArrayList<Double> keylist) {
-		for(int i=0;i<evals.length;i++){
-			double[] ret=table.get(keylist.get(i));
-			setColumn(eigenVector,ret,i);
-		}
-	}
-	
-	private void fillHashtable(double[] eigenValues, double[][] eigenVectors,
-			Hashtable<Double, double[]> table, Double[] evals) {
-		for(int i=0;i<eigenValues.length;i++){
-			Double key=evals[i];
-			double[] value=getColumn(eigenVectors ,i);			
-			table.put(key,value);
-		}
-	}
-	
-	private double[] getColumn( double[][] mat, int j ){
-		int m = mat.length;
-		double[] res = new double[m];
-		for ( int i = 0; i < m; ++i ){
-			res[i] = mat[i][j];
-		}
-		return(res);
-	}
-	
-	private void setColumn(double[][] mat,double[] col,int c){
-		int len=col.length;
-		for(int row=0;row<len;row++){
-			mat[row][c]=col[row];
-		}
-	}
-	
 	private Matrix2D getNormalisedImagesData(BufferedImage[] bufImgs){
-		int imageWidth=bufImgs[0].getWidth();
-		int imageHeight=bufImgs[0].getHeight();
-		int rows=bufImgs.length;
-		int cols=imageWidth * imageHeight;
-		double[][] data=new double[rows][cols];
-		for(int i=0;i<rows;i++){						
+		int imageWidth = bufImgs[0].getWidth();
+		int imageHeight = bufImgs[0].getHeight();
+		int rows = bufImgs.length;
+		int cols = imageWidth * imageHeight;
+		double[][] data = new double[rows][cols];
+		for(int i=0; i < rows; i++){						
 			bufImgs[i].getData().getPixels(0,0, imageWidth,imageHeight,data[i]);
 		}
-		Matrix2D imagesData=new Matrix2D(data);
+		Matrix2D imagesData = new Matrix2D(data);
+		//logger.info("images before normalisation");
+		//logger.info(imagesData.toString());
 		imagesData.normalise();
+		//logger.info("images normalised");
+		//logger.info(imagesData.toString());
 		return imagesData;		
 	}
 	
 	private void checkImageDimensions(List<String> filenames,
 			BufferedImage[] bufimgs) throws FaceRecError {
-		int imgheight=0;
-		int imgwidth=0;
-		for(int i=0;i<bufimgs.length;i++){			
+		int imgheight = 0;
+		int imgwidth = 0;
+		for(int i = 0; i< bufimgs.length; i++){			
 			if(i == 0){
 				imgheight = bufimgs[i].getHeight();
-				imgwidth=bufimgs[i].getWidth();				
+				imgwidth = bufimgs[i].getWidth();				
 			}
 			if((imgheight != bufimgs[i].getHeight()) || (imgwidth != bufimgs[i].getWidth())){
 				String response = "all images should have same dimensions! " + filenames.get(i) + " is of diff size";
+				logger.log(Level.SEVERE,response);
 	            throw new FaceRecError(response);
 			}
 		}
@@ -320,6 +350,7 @@ public class FaceRec{
 		    op.filter(img,gray); 
 			return gray;
 		}catch(Exception e){
+			logger.log(Level.SEVERE,"grayscale conversion failed",e);
 			throw new FaceRecError("grayscale conversion failed:\n" + e.getMessage());
 		}		
 	}
@@ -330,7 +361,7 @@ public class FaceRec{
 				fout = new FileOutputStream(dir + File.separator+"mycache.cache");
 			    fos = new ObjectOutputStream(fout);
 			    fos.writeObject(cachedata);
-			    debug("wrote cache");
+			    logger.info("wrote cache");
 			    //fos.close();
 			    fout.close();	
 	}
@@ -348,7 +379,8 @@ public class FaceRec{
 			List<String> newFileNames) throws FaceRecError {
 		int numImgs = newFileNames.size();
 		if(selectedNumOfEigenFaces <= 0 || selectedNumOfEigenFaces >= numImgs){
-			throw new FaceRecError("incorrect number of selectedeigenfaces used..\n use a number between 0 and upto "+numImgs);
+			logger.log(Level.SEVERE,"incorrect number of selectedeigenfaces" + selectedNumOfEigenFaces+"used"+"allowed btw 0-" + numImgs);
+			throw new FaceRecError("incorrect number of selectedeigenfaces used..\n use a number between 0 and upto " + (numImgs-1));
 		}
 	}
 	
@@ -388,7 +420,7 @@ public class FaceRec{
 			processCache(dir,newFileNames,oldBundle,selectedNumOfEigenFaces);
 		}
 		catch(FileNotFoundException e){
-			debug("cache file not found");
+			logger.info("cache file not found");
 			doCalculations(dir,newFileNames,selectedNumOfEigenFaces);
 		}
 		catch(Exception e){
@@ -403,7 +435,7 @@ public class FaceRec{
 			this.weights = calculateWeights(oldBundle,selectedNumOfEigenFaces);
 		}
 		else{
-			debug("folder contents changed");
+			logger.info("folder contents changed");
 			doCalculations(dir,newFileNames,selectedNumOfEigenFaces);
 		}
 	}
@@ -414,12 +446,12 @@ public class FaceRec{
 		WritableRaster wr = rast.createCompatibleWritableRaster();		
 		double maxValue = Double.MIN_VALUE;
 		double minValue = Double.MAX_VALUE;		
-		for(int i = 0; i<imgdata.length; i++){
+		for(int i = 0; i < imgdata.length; i++){
 			maxValue = Math.max(maxValue, imgdata[i]);
 			minValue = Math.min(minValue, imgdata[i]);			
 		}
-		for(int j=0;j<imgdata.length;j++){
-			imgdata[j] = ((imgdata[j]-minValue)*255)/(maxValue-minValue);
+		for(int j = 0; j < imgdata.length; j++){
+			imgdata[j] = ((imgdata[j] - minValue)*255) / (maxValue - minValue);
 		}		
 		wr.setPixels(0, 0, wd,imgdata.length/wd, imgdata);
 		bufimg.setData(wr);
@@ -431,7 +463,7 @@ public class FaceRec{
 	private void makeNewFolder(String fldr){
 		File folder = new File(fldr);
 		if (folder.isDirectory()){
-			printError("folder:"+fldr+" exists");
+			printError("folder:" + fldr + " exists");
 			deleteContents(folder);
 		}
 		else{
@@ -446,7 +478,7 @@ public class FaceRec{
 	
 	private void deleteContents(File f) {
 		File[] files = f.listFiles();
-		for(File i:files){
+		for(File i : files){
 			delete(i);
 		}
 	}
@@ -455,7 +487,7 @@ public class FaceRec{
 		if(i.isFile()){
 			boolean deleted = i.delete();
 			if (!deleted){
-				printError("file:"+i.getPath() +"could not be deleted");
+				printError("file:" + i.getPath() + "could not be deleted");
 			}
 		}
 	}
@@ -479,7 +511,7 @@ public class FaceRec{
 		String ext = ".png";		
 		reconstructPhiImages(phi, reconFolderName, ext);		
 		reconstructOriginalImages(xnew, reconFolderName, ext);
-		debug("reconstruction over");		
+		logger.info("reconstruction over");		
 	}
 	
 	private double[][] getPhiData(Matrix2D egnfacesSubMatrix,Matrix2D eigenvalsSubMatrix) {
@@ -581,13 +613,24 @@ public class FaceRec{
 	//demo main
 	public static void main(String[] args){
 		long start = System.currentTimeMillis();
-        if (args.length< 4){
+        /*if (args.length< 4){
         	printError("Usage:  java FaceRec  imageName imageDir  numberOfEigenfaces threshold");
         }
 		String imgToCheck = args[0];
 		String imgDir = args[1];
 		String numFaces = args[2];
-		String thresholdVal = args[3];
+		String thresholdVal = args[3];*/
+		
+		
+		String imgToCheck ="/home/sajan/Pictures/PGMSETSSMALL/amber1.pgm";
+		String imgDir = "/home/sajan/Pictures/PGMSETSSMALL";
+		//String imgToCheck ="/home/sajan/Pictures/PGMSETS/amber1.pgm";
+		//String imgDir = "/home/sajan/Pictures/PGMSETS";
+		
+		//String imgToCheck ="/home/sajan/Pictures/pngimgs/probes/amber1.png";
+		//String imgDir = "/home/sajan/Pictures/pngimgs/gallery";
+		String numFaces = "4";
+		String thresholdVal = "2";
 		MatchResult r = new FaceRec().processSelections(imgToCheck,imgDir,numFaces,thresholdVal);
 		if (r.getMatchSuccess()){
 			debug(imgToCheck + " matches "+r.getMatchFileName()+" at distance=" + r.getMatchDistance());

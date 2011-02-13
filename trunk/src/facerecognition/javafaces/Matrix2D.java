@@ -19,13 +19,13 @@ public class Matrix2D extends DenseDoubleMatrix2D {
 		int columns=(rows != 0 ? data.length/rows : 0);
 		if (rows*columns != data.length) {
 	         throw new IllegalArgumentException("Array length must be a multiple of "+rows);
-	      }
+	    }
 		double[][]vals = new double[rows][columns];
 		for (int i = 0; i < rows; i++) {
 		    for (int j = 0; j < columns; j++) {
 		      vals[i][j] = data[i+j*rows];
-		       }
 		    }
+		}
 		super.assign(vals);		
 	}
 	public Matrix2D getSubMatrix(int rows){
@@ -157,5 +157,7 @@ public class Matrix2D extends DenseDoubleMatrix2D {
 	public int hashCode(){
 		throw new UnsupportedOperationException("cannot use this class instance as hash key");
 	}
+	
+	
 	
 }
