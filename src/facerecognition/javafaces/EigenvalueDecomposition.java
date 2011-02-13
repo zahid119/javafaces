@@ -8,7 +8,9 @@ public class EigenvalueDecomposition extends cern.colt.matrix.linalg.EigenvalueD
 		return diag(getD().toArray());
 	}
 	public double[][] getEigenVectors(){
-		return getV().toArray();
+		//return getV().toArray();//columns are eigenvectors
+		return getV().viewDice().toArray();//now rows are eigenvectors
+		
 	}
 	private double[] diag(double[][] m) {
 	    double[] d = new double[m.length];
