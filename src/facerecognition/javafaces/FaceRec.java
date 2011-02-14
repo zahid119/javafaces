@@ -11,8 +11,6 @@ import java.util.logging.SimpleFormatter;
 
 import javax.imageio.ImageIO;
 
-import facerecognition.utils.ValueIndexPairComparator;
-
 import facerecognition.utils.ValueIndexPair;
 
 
@@ -175,18 +173,15 @@ public class FaceRec{
 		double[] eigenvalues = egdecomp.getEigenValues();
 		double[][]eigvectors = egdecomp.getEigenVectors();
 		
-		logger.info("eigenvalues");
-		logger.info(new Matrix2D(eigenvalues,1).toString());
+		//logger.info("eigenvalues");
+		//logger.info(new Matrix2D(eigenvalues,1).toString());
 		
-		logger.info("eigvectors");
-		logger.info(new Matrix2D(eigvectors).toString());
+		//logger.info("eigvectors");
+		//logger.info(new Matrix2D(eigvectors).toString());
 		
-		//sortEigenVectors(eigenvalues,eigvectors);
-		ArrayList<ValueIndexPair> pairList = getSortedPairs(eigenvalues, eigvectors);
+		TreeSet<ValueIndexPair> pairList = getSortedPairs(eigenvalues, eigvectors);
 		eigenvalues = getSortedVector(pairList);
 		eigvectors = getSortedMatrix(eigvectors,pairList);
-		
-		
 		
 		//logger.info("AFTER SORTING");
 		//logger.info("eigenvalues");
@@ -202,48 +197,48 @@ public class FaceRec{
 		FaceBundle b = new FaceBundle(filenames,imagesData.toArray(),averageFace,eigenFaces.toArray(),eigenvalues,imageWidth,imageHeight);
 		return b;	
 	}
-	public double[] getSortedVector(ArrayList<ValueIndexPair> pairList) {
-		double[] sortedVector = new double[pairList.size()];
-		for(int i = 0; i < pairList.size(); i++){
-			sortedVector[i] = pairList.get(i).getVectorElement();
+	
+	public double[] getSortedVector(TreeSet<ValueIndexPair> pairSet) {
+		double[] sortedVector = new double[pairSet.size()];
+		ValueIndexPair[] viArray = pairSet.toArray(new ValueIndexPair[0]);
+		for(int i = 0; i < pairSet.size(); i++){
+			sortedVector[i] = viArray[i].getVectorElement();
 		}
 		return sortedVector;
 	}
 	
-	public  double[][] getSortedMatrix(double[][] origmatrix,ArrayList<ValueIndexPair> pairList){
-		int rows = pairList.size();
+	public  double[][] getSortedMatrix(double[][] origmatrix,TreeSet<ValueIndexPair> pairSet){
+		int rows = pairSet.size();
 		int cols = origmatrix[0].length; 
 		double[][] sortedMatrix  = new double[rows][cols];
+		ValueIndexPair[] viArray = pairSet.toArray(new ValueIndexPair[0]);
 		//fill a 2D array using data from rows of original matrix
-		for(int i = 0; i < pairList.size(); i++){
-			sortedMatrix[i] = origmatrix[ pairList.get(i).getMatrixRowIndex()];
+		for(int i = 0; i < pairSet.size(); i++){
+			sortedMatrix[i] = origmatrix[ viArray[i].getMatrixRowIndex()];
 		}
+		
 		return sortedMatrix;
 	}
 	
-	public  ArrayList<ValueIndexPair> getSortedPairs(double[] aVector,
+	public  TreeSet<ValueIndexPair> getSortedPairs(double[] aVector,
 			double[][] aMatrix) {
-		ArrayList<ValueIndexPair> pairList = createPairs(aVector, aMatrix);
-		ValueIndexPairComparator dpc = new ValueIndexPairComparator();
-		Collections.sort(pairList, dpc);
-		return pairList;
+		TreeSet<ValueIndexPair> pairSet = createPairs(aVector, aMatrix);
+		return pairSet;
 	}
 	
-	public  ArrayList<ValueIndexPair> createPairs(double[] aVector, double[][] aMatrix) {
-		ArrayList<ValueIndexPair> pList = null;
+	public  TreeSet<ValueIndexPair> createPairs(double[] aVector, double[][] aMatrix) {
+		TreeSet<ValueIndexPair> pList = null;
 		if (aVector.length != aMatrix.length){
 			printError("matrix rows don't match items in vector ");
 		}else{
-			pList = new ArrayList<ValueIndexPair>(aVector.length);
+			pList = new TreeSet<ValueIndexPair>();
 			for(int i = 0; i < aVector.length; i++){
 				ValueIndexPair dp = new ValueIndexPair(aVector[i],i);
 				pList.add(dp);
 			}
 		}
 		return pList;
-		
 	}
-	
 	private EigenvalueDecomposition getEigenvalueDecomposition(
 			Matrix2D imagesData) {
 		Matrix2D imagesDataTr = imagesData.transpose();
